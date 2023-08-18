@@ -1,0 +1,330 @@
+```{r}
+library(tidyverse)
+library(postmastr)
+library(usdata)
+library(rvest)
+```
+
+```{r}
+wbb_rosters23 <- read_csv("https://github.com/dwillis/wbb-rosters/raw/main/rosters_2022-23.csv")
+```
+
+# Teams That Have Roster Data
+
+```{r}
+teams <- read_csv("https://raw.githubusercontent.com/dwillis/jour479x_fall_2022/main/data/teams.csv") %>% select(-url, -twitter, -stats_name, -private)
+
+roster_teams <- wbb_rosters23 %>% distinct(ncaa_id) %>% mutate(has_roster = 1)
+
+teams <- teams %>% 
+  left_join(roster_teams) %>% mutate(roster = has_roster)
+
+teams_without_rosters <- teams %>% 
+  filter(is.na(roster))
+
+wbb_rosters23 <- wbb_rosters23 %>% 
+  left_join(teams, by=c("ncaa_id", "team")) 
+```
+# Height Cleaning
+
+```{r}
+wbb_rosters23 <- wbb_rosters23 %>% 
+  mutate(height_clean = str_replace(height, "'", '-')) %>% 
+  mutate(height_clean = str_replace(height_clean, "’", '-')) %>% 
+  mutate(height_clean = str_replace(height_clean, "''", '')) %>% 
+  mutate(height_clean = str_replace(height_clean, '"', '')) %>%
+  separate(height_clean, c('height_ft', 'height_in'), sep="-", extra="merge") %>% 
+  mutate(height_ft = as.numeric(height_ft), height_in = as.numeric(height_in)) %>%
+  mutate(total_inches = (height_ft*12)+height_in)
+
+
+wbb_rosters23 %>% 
+  group_by(total_inches) %>% 
+  summarise(
+    total = n()
+  )
+```
+
+We've got 98 with NA heights.
+
+```{r}
+wbb_rosters23 %>% filter(is.na(total_inches)) %>% group_by(team) %>% summarize(count = n()) %>% arrange(desc(count))
+```
+
+#To populate missing heights, I manually inputted data from rosters I found online on team websites. If heights were not available online, in the case of Oakland, I pulled data from ESPN. Here are the sites I looked at.
+--> https://salemtigers.com/sports/womens-basketball/roster
+--> https://athletics.geneva.edu/sports/womens-basketball/roster/taylor-haring/2887 
+--> https://goldengrizzlies.com/sports/womens-basketball/roster
+--> https://www.espn.com/womens-college-basketball/team/roster/_/id/2473/oakland-golden-grizzlies 
+--> https://www.sagehens.com/sports/wbkb/2021-22/roster 
+
+
+#I identified several issues with the data during this process.
+--> Mariona Garcia of Salem (WV) was not on team's official roster (she did play in 2 games, so is in the stats)
+--> Neither ESPN nor the official Oakland roster listed height for Brooke Daniels.
+--> Neither ESPN nor the official Oakland roster listed height for Eve Pardo.
+--> Neither ESPN nor the official Oakland roster listed height for Lianna Baxter of Oakland.
+--> Pomona-Pitzer is a special case and requires a different scrape become of the nature of the joint nature of the team. Here is the link to the roster: https://www.sagehens.com/sports/wbkb/2022-23/roster
+
+# Positions Cleaning
+
+```{r}
+
+positions_cleaned <- read_csv("https://raw.githubusercontent.com/dwillis/jour479x_fall_2022/main/data/wbb_positions.csv") %>%
+  select(-count)
+
+# replace Ball State's position column with NAs
+wbb_rosters23 <- wbb_rosters23 %>% mutate(position = ifelse(ncaa_id == 47, NA, position))
+
+# need to fix rows where the height is also in the position column
+# in many of those cases we used information from biography pages and/or previous teams or news coverage to assign the position.
+
+position_fixes <- wbb_rosters23 %>% left_join(positions_cleaned, by = "position") %>% filter(position == height)
+
+wbb_rosters23 <- wbb_rosters23 %>% left_join(positions_cleaned, by = "position")
+
+wbb_rosters23 %>% distinct(position_clean)
+
+## Primary/Secondary positions based on order of position_clean
+
+wbb_rosters23 <- wbb_rosters23 %>% mutate(position_full = position_clean)
+wbb_rosters23 <- wbb_rosters23 %>% mutate(position_clean = na_if(position_clean, "N/A"))
+wbb_rosters23 <- wbb_rosters23 %>% separate(position_clean, c('primary_position', 'secondary_position'), sep='/', extra='merge')
+wbb_rosters23 <- wbb_rosters23 %>% mutate(primary_position = case_when((primary_position == "G") ~ "Guard", (primary_position == "C") ~ "Center", (primary_position == "F") ~ "Forward", TRUE ~ primary_position)) 
+wbb_rosters23 <- wbb_rosters23 %>% mutate(secondary_position = case_when((secondary_position == "G") ~ "Guard", (secondary_position == "C") ~ "Center", (secondary_position == "F") ~ "Forward", TRUE ~ secondary_position))
+wbb_rosters23 <- wbb_rosters23 %>% mutate(primary_position = case_when((primary_position == "G") ~ "Guard", (primary_position == "C") ~ "Center", (primary_position == "F") ~ "Forward", TRUE ~ primary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("'", wbb_rosters23$primary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("5", wbb_rosters23$primary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("6", wbb_rosters23$primary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("'", wbb_rosters23$secondary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("5", wbb_rosters23$secondary_position))
+wbb_rosters23 <- wbb_rosters23 %>% filter(!grepl("6", wbb_rosters23$secondary_position))
+wbb_rosters23 %>% group_by(primary_position) %>% summarise(count = n()) %>% arrange(desc(count))
+wbb_rosters23 %>% group_by(secondary_position) %>% summarise(count = n()) %>% arrange(desc(count))
+
+
+write_csv(wbb_rosters23 %>% filter(is.na(position_full)), "~/code/jour479x_fall_2022/data/missing_positions.csv")
+
+```
+
+# Years Cleaning
+
+12/6 - Need to check NA year_clean and regenerate yearscleaned.csv with new entries from year. Need to update ~29 rows:
+
+Liberty
+https://golobos.com/sports/wbball/roster/season/2022-23/player/amaya-brown/ (RS-Sr.)
+https://www.valpoathletics.com/wbasketball/roster/2022-23/12601/ilysse-pitts/ (5th)
+https://csurams.com/sports/womens-basketball/roster/petra-farkas/8848 & https://ysusports.com/sports/womens-basketball/roster/lindsey-mack/6141 (Fifth Year)
+https://lsusports.net/sports/wbball/roster/player/alexis-morris/ (5th-year Senior)
+
+
+
+```{r}
+years_cleaned <- read_csv("https://raw.githubusercontent.com/dwillis/jour479x_fall_2022/main/data/yearscleaned.csv")
+
+missing_years <- left_join(wbb_rosters23, years_cleaned) %>% rename(year_clean = `year-clean`) %>% filter(is.na(year_clean))
+
+wbb_rosters23 <- left_join(wbb_rosters23, years_cleaned) %>% rename(year_clean = `year-clean`) %>% select(-count)
+
+```
+
+# Previous School Cleaning
+
+Some records list the player's high school in the previous school column. We filter those out and turn it into a list, then update `wbb_rosters23` to replace hs_clean with the previous school for those rows.
+
+```{r}
+hs_wbb <- wbb_rosters23 %>%
+  filter(is.na(high_school))%>%
+  filter(!is.na(previous_school))%>%
+  filter(str_detect(previous_school, "HS"))%>%
+  mutate(hs_clean = "")%>%
+  mutate(hs_clean = previous_school)%>%
+  mutate(type = "has hs")
+extras_wbb <- wbb_rosters23 %>%
+  filter(!is.na(high_school))%>%
+  filter(is.na(previous_school))%>%
+  mutate(hs_clean = "")%>%
+  mutate(type = "no hs")
+all_wbb <- bind_rows(hs_wbb, extras_wbb)
+
+previous_school_is_hs=as.list(hs_wbb$previous_school)
+
+# update based on list membership
+
+wbb_rosters23 <- wbb_rosters23 %>%
+  mutate(hs_clean = case_when(
+    is.na(high_school) & previous_school %in% previous_school_is_hs ~ previous_school,
+    TRUE ~ high_school)
+  )
+
+# where previous school == hs_clean, replace previous_school with NA
+
+wbb_rosters23 <- wbb_rosters23 %>% 
+  mutate(previous_school = ifelse(previous_school == hs_clean, NA, previous_school))
+```
+
+# Hometown/Homestate Cleaning
+
+```{r}
+wbb_rosters23 <- wbb_rosters23 %>% 
+  mutate(hometown_cleaned = str_to_upper(str_replace(hometown, "\\.",""))) %>% 
+  mutate(hometown_cleaned = str_replace(hometown_cleaned,"\\.","")) %>%
+  mutate(hometown_cleaned = str_replace(hometown_cleaned,"/.*","")) %>%
+  mutate(hometown_cleaned = str_replace(hometown_cleaned,"\\.$","")) %>%
+  mutate(hometown_cleaned = str_replace(hometown_cleaned,",",", ")) %>%
+  mutate(hometown_cleaned = str_replace(hometown_cleaned,"-"," ")) %>% 
+  mutate(hometown_cleaned = str_squish(hometown_cleaned))
+
+states_non_standard <- pm_append(type = "state", input = c("SD.", "MASS", "CALIF", "MICH", "NEB", "IND", "MINN", "ORE", "OHIO", "FLA", "MISS", "TENN", "ARIZ", "KAN", "ALA", "OKLA", "WIS", "ILL", " WASH", "ARK", "COLO", "NEV", "CONN", "WISC", "WVA", "DEL", "WYO", "CALI", "LOUIS", "VIRG", "MONT", "PENN", "TEX", "KANS", "NEBR", "IDA", "COL"), output = c("SD", "MA", "CA", "MI", "NE", "IN", "MN", "OR", "OH", "FL", "MS", "TN", "AZ", "KS", "AL", "OK", "WI", "IL", "WA", "AR", "CO", "NV", "CT", "WI", "WV", "DE", "WY", "CA", "LA", "VA", "MT", "PA", "TX", "KS", "NE", "ID", "CO"), locale = "us")
+
+dict <- pm_dictionary(type='state', case = c("title", "upper", "lower"), append = states_non_standard)
+
+wbb_rosters23 <- wbb_rosters23 %>% pm_identify(var="hometown_cleaned")
+
+parsed <- wbb_rosters23 %>% 
+  pm_identify(var="hometown_cleaned") %>% 
+  pm_prep(var="hometown_cleaned", type="street") %>% 
+  pm_state_parse(dict)
+
+wbb_rosters23 <- left_join(wbb_rosters23, parsed, by="pm.uid")
+
+wbb_rosters23 %>%
+  filter(is.na(hometown_cleaned))
+
+wbb_rosters23 <- wbb_rosters23 %>% separate(hometown, c('hometown', 'homestate'), sep=',', extra='merge')
+
+wbb_rosters23 <- wbb_rosters23 %>% mutate(homestate=str_trim(homestate), homestate=str_replace(homestate, '\\.', '')) %>%
+  mutate(homestate = case_when(is.na(abbr2state(homestate)) ~ homestate, TRUE ~ (abbr2state(homestate))))
+
+```
+
+# Foreign Nation Cleaning
+
+Take the list of FIBA nations (https://www.fiba.basketball/rankingwomen) and make a list or dataframe of them, then compare that to the values in the `homestate` column generated above and populate a new column for country.
+
+I'm using the above approach to scrape the FIBA nations and put them in a dataframe. My logic is then as following:
+- Make a new column for country
+- Populate this column with USA when there is a state identified by postmaster
+- Then we are splitting the hometown_cleaned column by a ", " and taking the last item that was split by that function. This should give us either a state or a country, since country is listed as the last item in homewtown cleaned in the format "[city], [state], [country]", or "[city], [country]". Once we have this item we make it its own column "temp"
+- There are a few popular cases where a player's state is listed as a province in Canada. Since there are so many of these occurrences, we will just set the country to Canada when this happens, similar to the U.S. logic
+- Make the country uppercase to standardize
+- Add popular nations that aren't in FIBA to the FIBA dataframe
+- Use this FIBA dataframe as a list of countries to join on "temp"
+- When the "temp" column had a successful join with the FIBA countries, we know that it's a recognized country. Then we will take this "temp" value and put it in "country. Otherwise we'll keep the current country value (Canada, USA)
+- Then we'll drop the columns we don't need anymore
+
+--- JETSON
+
+
+```{r}
+fibaurl <- "https://www.fiba.basketball/rankingwomen"
+nations <- fibaurl %>%
+  read_html() %>%
+  html_nodes(xpath = '//*[@id="fiba_ranking_table_wrapper"]/table') %>%
+  html_table()
+nations_df <- nations[[1]]
+wbb_rosters23 <- mutate(wbb_rosters23, country = case_when(!is.na(pm.state) ~ "USA"))
+
+
+wbb_rosters23 <- wbb_rosters23 %>% mutate(temp = sapply(strsplit(wbb_rosters23$hometown_cleaned, ", ", fixed=TRUE), tail, 1))
+
+wbb_rosters23 <- mutate(wbb_rosters23, country = case_when(
+  temp %in% c('BC', 'QUEBEC', 'BRITISH COLUMBIA', 'ALBERTA', 'ONTARIO', 'NOVA SCOTIA', 'ONT') ~ "CANADA", 
+  temp == "THE NETHERLANDS" ~ "NETHERLANDS", 
+  temp == "SOUTH AUSTRALIA" ~ "AUSTRALIA",  
+  temp == "WESTERN AUSTRALIA" ~ "AUSTRALIA",
+  temp == "BOSNIA" ~ "BOSNIA AND HERZEGOVINA",
+  temp == "MACEDONIA" ~ "MACEDONIA",
+  temp == "TAIWAN" ~ "TAIWAN",
+  temp == "PAPUA NEW GUINEA" ~ "PAPUA NEW GUINEA",
+  TRUE ~ country))
+
+nations_df$Country <- toupper(nations_df$Country)
+
+
+
+added_nations <- data.frame(Worldrank=c(0, 0, 0, 0),
+                  Country=c('ENGLAND', 'RUSSIA', 'SCOTLAND', 'NORTHERN IRELAND'),
+                  Zonerank=c(0, 0, 0, 0),
+                  IOC=c('', '', '', ''),
+                  "Current points"=c(0, 0, 0, 0),
+                  "+/- Rank *"=c(0, 0, 0, 0),
+                  check.names = FALSE)
+nations_df <- rbind(nations_df, added_nations)
+
+
+wbb_rosters23 <- left_join(wbb_rosters23, nations_df, by=c('temp'='Country'))
+
+wbb_rosters23 <- mutate(wbb_rosters23, country = case_when((!is.na(Worldrank) & is.na(country)) ~ temp, is.na(Worldrank) &  !is.na(country) ~ country, country == "USA" ~ "USA"))
+
+wbb_rosters23 <- subset(wbb_rosters23, select = -c(Worldrank,Zonerank,IOC,`Current points`, `+/- Rank *`) )
+
+wbb_rosters23 %>% filter(is.na(country))
+```
+```{r}
+wbb_rosters23 %>% group_by(hometown,homestate, country) %>% summarise(count=n()) %>% arrange(desc(count))
+wbb_rosters23 <- subset(wbb_rosters23, select = -c(temp) )
+
+```
+
+# Data Exploration Section
+
+
+#Which teams/conferences/divisions have the most first-year players? Which have the most seniors & graduate students?
+
+```{r}
+teams_first_year <- wbb_rosters23 %>% filter(year_clean == "Freshman") %>% group_by(team, division) %>% summarise(count = n()) %>% arrange(desc(count))
+#the top three schools are Mary Hardin Baylor, Simpson and Anderson (IN). The D1 school with the most freshmen is Northern Colorado
+
+conference_first_year <- wbb_rosters23 %>% group_by(conference, division) %>% summarise(count = n()) %>% arrange(desc(count))
+#PSAC, RMAC and NSIC have the most freshmen. All are D2 conferences. A10 is the fourth most, and the D1 conference with the most freshmen
+
+division_first_year <- wbb_rosters23 %>% group_by(division) %>% summarise(count = n()) %>% arrange(desc(count))
+#Division 1 had the most first year players, followed by D3 and then D2. 
+
+teams_seniors_grad <- wbb_rosters23 %>% filter(year_clean == "Senior" | year_clean == "Graduate Student" | year_clean == "Sixth Year" | year_clean == "Fifth Year") %>% group_by(team, division) %>% summarise(count = n()) %>% arrange(desc(count))
+#Austin Peay, Seton Hall and Gannon have the most seniors and grad students. The top two are D1 schools.
+
+conference_seniors_grad <- wbb_rosters23 %>% filter(year_clean == "Senior" | year_clean == "Graduate Student" | year_clean == "Sixth Year" | year_clean == "Fifth Year") %>% group_by(conference, division) %>% summarise(count = n()) %>% arrange(desc(count))
+#The ACC, SEC and and A10 have the most seniors and grad students. The top seven conferences by seniors and grad students are all D1 conferences. 
+
+division_seniors_grad <- wbb_rosters23 %>% filter(year_clean == "Senior" | year_clean == "Graduate Student" | year_clean == "Sixth Year" | year_clean == "Fifth Year") %>% group_by(division) %>% summarise(count = n()) %>% arrange(desc(count))
+#D1 has, by far, the most seniors and grad students. D1 has 1.6x times as many seniors and grad students as D3 (second most). 
+```
+
+#Data exploration: which teams/conferences/divisions have the most/least in-state players?
+```{r}
+team_in_state_players_na <- wbb_rosters23  %>%
+  group_by(team, team_state, pm.state, division, conference) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  filter(is.na(pm.state))
+
+team_recruiting <- wbb_rosters23 %>%
+  group_by(team, team_state, pm.state) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+conference_recruiting <- wbb_rosters23 %>%
+  group_by(conference, team_state, pm.state) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+division_recruiting <- wbb_rosters23 %>%
+  group_by(division, team_state, pm.state) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+wbb_rosters23 %>% group_by(team_state) %>% summarise(count = n_distinct(team)) %>% arrange(desc(count))
+
+wbb_rosters23 %>% filter(is.na(team_state))
+```
+
+In a lot of cases, we got NA as a result for the pm.state. In the cases of the DI schools, this meant that someone was an international player. 
+
+# Final Cleaning
+
+```{r}
+wbb_rosters23 <- wbb_rosters23 %>% 
+  rename(team_clean = team, height_clean = height, position_clean = position_full, previous_school_clean = previous_school, hometown_clean = hometown_cleaned, state_cleaned = pm.state, foreign_nation_clean = country)
+```

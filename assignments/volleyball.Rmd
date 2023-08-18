@@ -1,0 +1,70 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+teams <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2021.csv")
+```
+
+```{r}
+team_totals <- teams %>% 
+  mutate(block_totals = block_solos + (block_assists *0.5)) %>% 
+  group_by(team) %>% 
+  summarise(kills_avg = mean(kills),
+            aces_avg = mean(aces),
+            digs_avg = mean(digs),
+            assists_avg = mean(assists),
+            blocks_avg = mean(block_totals),
+            errors_avg = mean(errors),
+            sets_avg = mean(s),
+            score_diff_avg = mean(team_score - opponent_score),
+            serve_err_avg = mean(s_err),
+            hit_pct_avg = mean(hit_pct),
+            def_hit_pct_avg = mean(defensive_hit_pct),
+            total_attacks_avg = mean(total_attacks)
+  )
+
+```
+
+```{r}
+team_zscores <- team_totals %>% 
+  mutate(kills_zscore = as.numeric(scale(kills_avg, center=TRUE, scale=TRUE)),
+         aces_zscore = as.numeric(scale(aces_avg, center=TRUE, scale=TRUE)),
+         digs_zscore = as.numeric(scale(digs_avg, center=TRUE, scale=TRUE)),
+         assists_zscore = as.numeric(scale(assists_avg, center=TRUE, scale=TRUE)),
+         blocks_zscore = as.numeric(scale(blocks_avg, center=TRUE, scale=TRUE)),
+         sets_avg_zscore = as.numeric(scale(sets_avg, center=TRUE, scale=TRUE)),
+         errors_avg_zscore = as.numeric(scale(errors_avg, center=TRUE, scale=TRUE)),
+         serve_err_avg_zscore = as.numeric(scale(serve_err_avg, center=TRUE, scale=TRUE)),
+         score_diff_avg_zscore = as.numeric(scale(score_diff_avg, center=TRUE, scale=TRUE)),
+         hit_pct_avg_zscore = as.numeric(scale(hit_pct_avg, center=TRUE, scale=TRUE)),
+         def_hit_pct_avg_zscore = as.numeric(scale(def_hit_pct_avg, center=TRUE, scale=TRUE)) * -1,
+         total_attacks_avg_zscore = as.numeric(scale(total_attacks_avg, center=TRUE, scale=TRUE)),
+         # the combination of kills/aces/total attacks looks ok, but in the Big Ten overrates Illinois & Northwestern
+#         total_z_score = kills_zscore + aces_zscore + total_attacks_avg_zscore
+ 
+        # combination of kills/assists/blocks puts some bigger schools at the top nationally, but doesn't seem to represent overall quality well
+#         total_z_score = kills_zscore + assists_zscore + blocks_zscore
+
+         # definitely a miss with kills/sets_avg/errors - makes Nebraska an average team.
+#         total_z_score = kills_zscore + sets_avg_zscore + errors_avg_zscore
+
+         # closer with kills/score_diff/total_attacks - nationally it's makes some unusual teams look great, but in Big Ten looks more accurate
+#         total_z_score = kills_zscore + score_diff_avg_zscore + total_attacks_avg_zscore
+
+         # kills/def_hit_pct/total_attacks looks pretty solid in the Big Ten but nationally it's similar to previous one.
+         total_z_score = kills_zscore + def_hit_pct_avg_zscore + total_attacks_avg_zscore
+         )
+
+```
+
+```{r}
+team_zscores %>% select(team, total_z_score) %>% arrange(desc(total_z_score))
+```
+Results: the combination of Z-scores for kills, defensive hit percentage and total attacks might be my best candidate. Nationally there are a bunch of teams that do very well in one of those areas, possibly due to inconsistent or weak competition, but Nebraska shows up pretty high (top 20) as does Wisconsin (top 30). Wright State is overall #1 because it ranks third nationally in total attacks and 14th in opponent hit percentage, so that boosts its z-score a lot. Maryland ranks 227th out of 340 teams here, which seems harsh but this doesn't take into account levels of competition, just performance. Next I'll narrow it down to the Big Ten to see what this metric looks like there:
+
+```{r}
+big_ten = c('Nebraska Cornhuskers', 'Maryland Terrapins, Terps', 'Wisconsin Badgers', 'Michigan Wolverines', 'Northwestern Wildcats', 'Iowa Hawkeyes', 'Rutgers Scarlet Knights', 'Illinois Fighting Illini', 'Ohio St. Buckeyes', 'Michigan St. Spartans', 'Minnesota Golden Gophers', 'Purdue Boilermakers', 'Indiana Hoosiers', 'Penn St. Nittany Lions')
+team_zscores %>% filter(team %in% big_ten) %>% select(team, total_z_score) %>% arrange(desc(total_z_score))
+```
+This looks pretty reasonable compared to the 2021 standings (https://bigten.org/standings.aspx?standings=34), although Minnesota seems inflated compared to Nebraska and Wisconsin. Maryland is a slightly below average team using this metric, which seems right. The question is whether I've chosen a metric that mostly accurately values Maryland vs one that mostly accurate values the Big Ten as a whole.
