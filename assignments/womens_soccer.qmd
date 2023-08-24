@@ -1,0 +1,51 @@
+---
+title: "Women's Soccer Data"
+output: html_notebook
+---
+
+We'll use this notebook to explore some NCAA women's soccer data and [our questions](https://docs.google.com/spreadsheets/d/1kTSrnl1URmcexIWLDMWqDnp3q-c2OS45uifnhjp10n4/edit#gid=0). First, let's load the tidyverse library:
+
+```{r}
+library(tidyverse)
+```
+
+We'll want to start with 2023 match data, which is located in [this GitHub repository](https://github.com/dwillis/NCAAWomensSoccerData). We can load the match data directly from GitHub using `read_csv`:
+
+
+```{r}
+matches_2023 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2023.csv")
+```
+
+Let's take a look at this data to see what it contains, using `head` and `glimpse`:
+
+```{r}
+head(matches_2023)
+glimpse(matches_2023)
+```
+
+Now, onto the questions using aggregates, which means `group_by` and `summarize`:
+
+1. How many shots in total has Maryland attempted and how many have been on goal? Calculate a percentage of shots on goal.
+
+```{r}
+
+```
+
+2. What about the same shot stats from last season's first four games? You'll need to load the matches from 2022 - just change the season in the URL - and filter by date to find the first four games.
+
+```{r}
+
+```
+
+
+3. What about draws - Maryland started 2022 with 4 ties. Have any other teams had as many this season?
+
+```{r}
+```
+
+
+4. How many total corner kicks has Maryland had so far and how many have its opponents have? Calculate the difference between the two totals for every team.
+
+```{r}
+```
+
