@@ -14,6 +14,8 @@ We'll want to start with 2023 match data, which is located in [this GitHub repos
 
 ```{r}
 matches_2023 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2023.csv")
+
+matches_2022 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2022.csv")
 ```
 
 Let's take a look at this data to see what it contains, using `head` and `glimpse`:
@@ -28,13 +30,27 @@ Now, onto the questions using aggregates, which means `group_by` and `summarize`
 1. How many shots in total has Maryland attempted and how many have been on goal? Calculate a percentage of shots on goal.
 
 ```{r}
-
+matches_2023 |> 
+  group_by(team) |> 
+  summarise(
+    total_shots = sum(sh_att), 
+    total_on_goal = sum(so_g),
+    percent = (total_on_goal/total_shots)*100
+  )
 ```
 
 2. What about the same shot stats from last season's first four games? You'll need to load the matches from 2022 - just change the season in the URL - and filter by date to find the first four games.
 
 ```{r}
-
+matches_2022 |> 
+  filter(team == 'Alcorn Lady Braves') |> 
+  group_by(team) |> 
+  summarise(
+    total_shots = sum(sh_att), 
+    total_on_goal = sum(so_g),
+    percent = (total_on_goal/total_shots)*100
+  ) |> 
+  arrange(desc(percent))
 ```
 
 
@@ -47,5 +63,14 @@ Now, onto the questions using aggregates, which means `group_by` and `summarize`
 4. How many total corner kicks has Maryland had so far and how many have its opponents have? Calculate the difference between the two totals for every team.
 
 ```{r}
+
+matches_2023 |> 
+  group_by(team) |> 
+  summarise(
+    avg_corners = mean(corners), 
+    avg_defensive_corners = mean(defensive_corners),
+    diff = (avg_corners-avg_defensive_corners)
+  ) |> 
+  arrange(desc(diff))
 ```
 
