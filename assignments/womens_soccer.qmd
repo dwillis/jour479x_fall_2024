@@ -83,3 +83,49 @@ matches_2023 |>
   arrange(desc(diff))
 ```
 Maryland is -2 in corner differential this season. Troy is absolutely crushing it on corners.
+
+
+### Significance tests
+
+Make sure you load the 2022 and 2023 matches data above. For both, we'll need to add a column called `total_goals` and populate it using `mutate()`. You'll save that new dataframe with the same name:
+
+```{r}
+matches_2022 <- matches_2022 |> mutate(total_goals = goals + defensive_goals)
+matches_2022_partial <- matches_2022 |> filter(date < '2022-09-13')
+matches_2023 <- matches_2023 |> mutate(total_goals = goals + defensive_goals)
+
+matches_2022_partial |> summarize(sum(total_goals))
+
+matches_2023 |> summarize(sum(total_goals))
+
+```
+
+Our Null Hypothesis is that there is no significant difference in the average number of goals scored in 2022 and 2023. Our Alternative Hypothesis is there is a significant difference in the average number of goals scored in 2022 and 2023.
+
+```{r}
+
+# Perform a t-test to compare average goals in 2022 and 2023
+result <- t.test(matches_2022$total_goals, matches_2023$total_goals)
+
+# Print the t-test result
+print(result)
+
+```
+Based on the output (read from the bottom), is scoring up this year, and is that result significant? Explain your answers.
+
+
+
+Second question: is this a fair comparison? If not, what would make it fairer?
+
+
+```{r}
+matches_2023 |> summarise(max(date))
+```
+
+## What about scoring home and away?
+
+
+```{r}
+t.test(total_goals ~ home_away, data=matches_2023)
+```
+
