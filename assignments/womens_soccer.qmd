@@ -119,13 +119,7 @@ Second question: is this a fair comparison? If not, what would make it fairer?
 
 
 ```{r}
-matches_2023 |> summarise(max(date))
-```
-
-## What about scoring home and away?
-
-
-```{r}
-t.test(total_goals ~ home_away, data=matches_2023)
+matches_2022_early <- matches_2022 |> filter(date < '2022-09-14')
+t.test(matches_2022_early$total_goals, matches_2023$total_goals)
 ```
 
