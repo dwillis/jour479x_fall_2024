@@ -123,3 +123,24 @@ matches_2022_early <- matches_2022 |> filter(date < '2022-09-14')
 t.test(matches_2022_early$total_goals, matches_2023$total_goals)
 ```
 
+
+### Defensive model
+
+```{r}
+matches_2023 <- matches_2023 |> 
+  mutate(differential = team_score - opponent_score)
+```
+
+```{r}
+fit2 <- lm(differential ~ so_g + defensive_so_g , data = matches_2023)
+summary(fit2)
+```
+```{r}
+matches_2023 <- matches_2023 |> mutate(predicted = predict(fit2), residuals = residuals(fit2))
+
+
+big_ten = c('Wisconsin Badgers', 'Maryland Terrapins, Terps', 'Michigan Wolverines', 'Rutgers Scarlet Knights', 'Indiana Hoosiers', 'Iowa Hawkeyes', 'Penn St. Nittany Lions', 'Minnesota Golden Gophers', 'Illinois Fighting Illini', 'Ohio St. Buckeyes', 'Northwestern Wildcats', 'Michigan St. Spartans', 'Purdue Boilermakers')
+
+matches_2023 |> filter(differential < 5, team %in% big_ten, outcome == 'Draw') |> arrange(residuals) |> select(date, team, opponent, home_away, outcome, team_score, opponent_score, so_g, defensive_so_g, predicted, residuals)
+```
+
