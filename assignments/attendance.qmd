@@ -1,4 +1,4 @@
-## NCAA Football Attendance 
+## NCAA Football Attendance
 
 Let's load the tidyverse.
 
@@ -42,7 +42,3 @@ attendance_wide <- attendance_wide |> mutate(percent = (`2022`-`2019`)/`2019`*10
 Some of these clearly are influenced by performance on the field. Below, describe the most interesting results (positive or negative) and what you think might be going on with them. Feel free to do some googling and describe what other data would be helpful to clarify what the best stories here might be. What surprises you about these results?
 
 **ANSWER**
-
-
-
-
