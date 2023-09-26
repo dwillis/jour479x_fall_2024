@@ -1,0 +1,47 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+logs <- read_csv("https://dwillis.github.io/sports-data-files/footballlogs1122.csv")
+```
+### Set up differential
+
+```{r}
+logs <- logs |> 
+  mutate(differential = abs(TeamScore - OpponentScore))
+```
+
+### Simple regression model on Penalties
+
+```{r}
+fit <- lm(differential ~ Penalties, data = logs)
+summary(fit)
+```
+
+### Multiple regression model
+
+
+```{r}
+
+logs <- logs |> 
+  mutate(
+    net_penalties = Penalties - DefPenalties,
+    net_turnovers = TotalTurnovers - DefTotalTurnovers,
+    net_penalty_yards = PenaltyYds - DefPenaltyYds
+  )
+
+fit2 <- lm(differential ~ net_penalties + net_turnovers + net_penalty_yards, data = logs)
+summary(fit2)
+```
+
+### Close games
+
+```{r}
+close_games <- logs |> 
+  filter(differential <= 7)
+
+fit3 <- lm(differential ~ net_penalties + net_turnovers + net_penalty_yards, data = close_games)
+summary(fit3)
+```
+
