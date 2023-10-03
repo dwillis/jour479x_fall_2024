@@ -1,1 +1,55 @@
+```{r}
+library(tidyverse)
+```
+
+Here's an example of how to calculate z-scores using NCAA volleyball teams. We'll use match data for the 2023 season.
+
+```{r}
+matches <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2023.csv")
+```
+
+### Isolate the columns we might want to use for our metrics
+
+```{r}
+teamquality <- matches |> 
+  select(team, kills, s, errors, total_attacks, assists, s_err, digs, ret_att, r_err, b_err)
+```
+
+
+### Calculate averages
+
+```{r}
+teamtotals <- teamquality |> 
+  group_by(team) |> 
+  summarise(
+    avg_kills = mean(kills),
+    avg_errors = mean(errors),
+    avg_attacks = mean(total_attacks),
+    avg_assists = mean(assists),
+    avg_s_err = mean(s_err),
+    avg_digs = mean(digs),
+    avg_ret_att = mean(ret_att),
+    avg_r_err = mean(r_err),
+    avg_b_err = mean(b_err)
+  )
+```
+
+### Create Z-Scores
+
+```{r}
+teamzscore <- teamtotals |> 
+  mutate(
+    kills_zscore = as.numeric(scale(avg_kills, center = TRUE, scale = TRUE)),
+    errors_zscore = as.numeric(scale(avg_errors, center = TRUE, scale = TRUE)) * -1,
+    s_err_zscore = as.numeric(scale(avg_s_err, center = TRUE, scale = TRUE)) * -1,
+    digs_zscore = as.numeric(scale(avg_digs, center = TRUE, scale = TRUE)),
+    TotalZscore = kills_zscore + errors_zscore + s_err_zscore + digs_zscore
+  )
+```
+
+### Look at the results
+
+```{r}
+teamzscore |> select(team, TotalZscore, kills_zscore, errors_zscore, s_err_zscore, digs_zscore) |>  arrange(desc(TotalZscore))
+```
 
