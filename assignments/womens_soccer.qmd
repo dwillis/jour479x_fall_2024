@@ -73,15 +73,17 @@ matches_2024 |>
 4. How many total corner kicks has Maryland had so far this season and how many have its opponents have? Calculate the difference between the two totals for every team using group_by, summarize and mutate.
 
 ```{r}
-matches_2024 |>
+corner_totals <- matches_2024 |>
   group_by(team) |> 
   summarise(
-    umd_corners = sum(corners),
+    team_corners = sum(corners),
     def_corners = sum(defensive_corners)
   ) |> 
-  mutate(diff = umd_corners-def_corners) |> 
+  mutate(diff = team_corners-def_corners) |> 
   arrange(desc(diff))
 
+corner_totals |> 
+  filter(team == 'Maryland Terrapins, Terps')
 
 ```
 
